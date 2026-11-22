@@ -1,0 +1,220 @@
+Repo structure
+realtime-info-assistant/
+├── tools.py
+├── agent.py
+├── run_test_questions.py
+├── tests/
+│   ├── test_tools.py
+│   └── test_agent.py
+├── conftest.py
+├── docs/
+│   ├── api_exploration.md
+│   ├── sample_questions.md
+│   ├── error_handling_evidence.md
+│   └── api_limitations_and_risks.md
+├── .env.example
+├── .gitignore
+├── requirements.txt
+└── README.md
+Step 1: Secrets setup first
+
+Same order as last time: .gitignore containing .env is committed before any .env exists.
+
+powershell
+mkdir realtime-info-assistant
+cd realtime-info-assistant
+git init
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+
+.env.example (placeholders only):
+
+OPENAI_API_KEY=your-llm-key-here
+OPENAI_MODEL=gpt-5-mini
+# OPENAI_BASE_URL=   (unset = OpenAI; set it only if you use a gateway)
+EXCHANGERATE_API_KEY=your-exchangerate-key-here
+
+Confirm git check-ignore -v .env prints a match. Install:
+
+powershell
+pip install langchain langchain-openai python-dotenv httpx pytest
+
+requirements.txt (direct dependencies with floors and ceilings, saved as UTF-8):
+
+langchain>=1.5,<2
+langchain-openai>=1.8,<2
+openai>=3.0,<4
+httpx>=0.28
+python-dotenv>=1.0
+pytest>=8
+Step 2: Explore both APIs by hand
+
+This step is the heart of "learn how REST APIs exchange data." Before writing code, call each API from a browser, curl, or Postman, and read the JSON.
+
+Get your free key at exchangerate-api.com. Put it in .env, never in a file you commit.
+Geocoding: https://geocoding-api.open-meteo.com/v1/search?name=Lagos&count=1&language=en&format=json
+Forecast (use the coordinates you just got): https://api.open-meteo.com/v1/forecast?latitude=6.45&longitude=3.4&current=temperature_2m,wind_speed_10m&timezone=auto
+Currency: https://v6.exchangerate-api.com/v6/YOUR-KEY/pair/USD/NGN/100
+Break them on purpose. Search for name=Nowhereville, ask for a nonsense currency code, and use a wrong key. Notice the shape of each failure, because your error handling depends on it. In particular, check whether the error shows up in the HTTP status, in the JSON body, or both.
+
+Save what you learn in docs/api_exploration.md: the URLs, the real JSON fields you need (for example current.temperature_2m, conversion_rate, conversion_result), and what each failure looked like. Write YOUR-KEY in the saved URLs, never the real key.
+
+Step 3: Write tools.py
+
+Start with the one subtle piece, the HTTP helper:
+
+python
+import httpx
+
+TIMEOUT_SECONDS = 10.0
+_transport = None  # tests will replace this with httpx.MockTransport(...)
+
+class ApiProblem(Exception):
+    """An error whose message is safe to show the user (no URLs, no keys)."""
+
+def _get(url, params=None):
+    try:
+        with httpx.Client(timeout=TIMEOUT_SECONDS, transport=_transport) as client:
+            response = client.get(url, params=params)
+    except httpx.TimeoutException:
+        raise ApiProblem("The service took too long to respond. Please try again.") from None
+    except httpx.RequestError:
+        raise ApiProblem("Could not reach the service. Check your connection and try again.") from None
+    if response.status_code == 429:
+        raise ApiProblem("The service is rate-limiting requests. Please wait and try again.")
+    try:
+        return response.status_code, response.json()
+    except ValueError:
+        raise ApiProblem("The service returned data I could not read.") from None
+
+Two details matter:
+
+Catch httpx.TimeoutException before httpx.RequestError. Timeouts are a kind of request error, so the order decides which message appears.
+from None drops the original exception. Without it, the chained error can carry a URL with your key in it.
+
+Then write the two tools, each with a docstring that tells the model when to use it and what input it takes:
+
+python
+from langchain_core.tools import tool
+
+@tool
+def get_current_weather(city: str) -> str:
+    """..."""   # you write this description
+
+@tool
+def convert_currency(amount: float, from_currency: str, to_currency: str) -> str:
+    """..."""
+
+Behaviour to implement:
+
+Weather:
+
+Empty city: return a message with no HTTP request made.
+Geocode with count=1. If there's no results, return "couldn't find a place called…".
+Then fetch the forecast. If the server returns a 5xx or current is missing, return a "service unavailable" message.
+Return a readable sentence with the place, temperature, wind, and units.
+
+Currency:
+
+Validate locally before any request: codes must be three letters ("dollars" should be rejected with a helpful message), and the amount must be a positive, finite number.
+Read EXCHANGERATE_API_KEY from the environment. If it's missing, return a clear message.
+Check the JSON body for result == "error", not just the HTTP status. I couldn't call the live API, so I don't know which status codes it uses for each error. Map error-type values to friendly messages, with a catch-all for unknown ones.
+Return a sentence with the amount, both codes, the rate, and when the rate was last updated.
+
+End the file with TOOLS = [get_current_weather, convert_currency].
+
+Step 4: Write agent.py
+python
+from langchain.agents import create_agent
+
+agent = create_agent(llm, tools=TOOLS, system_prompt="...")
+result = agent.invoke(
+    {"messages": [{"role": "user", "content": question}]},
+    config={"recursion_limit": 8},
+)
+answer = result["messages"][-1].content
+
+Your system prompt should say to always use a tool for live data and never guess numbers, to explain tool errors plainly, and to decline other topics.
+
+recursion_limit stops a confused model from calling tools in an endless loop. Catch langgraph.errors.GraphRecursionError and return a friendly message.
+Catch the language-model errors the way you did last project (AuthenticationError, RateLimitError, APIConnectionError, APIStatusError, most specific first).
+Empty question: return a message without calling anything.
+Show which tool was used, since the brief wants evidence that the assistant "identifies the appropriate API tool." Read it from the result like this (I verified it):
+python
+tools_used = [c["name"] for m in result["messages"] if m.type == "ai" for c in m.tool_calls]
+Finish with a main() input loop that handles Ctrl+C and end-of-input.
+Step 5: Test without any network
+
+Tests should never hit the real APIs. Make tools._transport replaceable, as in Step 3, and inject fake responses:
+
+python
+import httpx, tools
+
+def mock(handler):
+    tools._transport = httpx.MockTransport(handler)
+
+mock(lambda request: httpx.Response(200, json={"results": [...]}))
+
+To test the agent without a real model, make a stand-in model that supports tools:
+
+python
+from langchain_core.language_models.fake_chat_models import GenericFakeChatModel
+from langchain_core.messages import AIMessage
+
+class FakeToolModel(GenericFakeChatModel):
+    def bind_tools(self, tools, **kwargs):
+        return self
+
+llm = FakeToolModel(messages=iter([
+    AIMessage(content="", tool_calls=[{"name": "get_current_weather", "args": {"city": "Lagos"}, "id": "c1"}]),
+    AIMessage(content="It is 31°C in Lagos."),
+]))
+
+Tests to write:
+
+weather success, unknown city, empty city (and that no request was made)
+weather timeout, unreachable network, a 5xx response, and a body that isn't JSON
+currency success, bad code, negative or zero amount, each documented error type, a 429, and a missing key
+a test that the key never appears in any returned message, including when the mocked failure message contains the full URL
+the agent calls a tool and then answers, an empty question, and an endless tool loop that hits the guard
+each tool's description is non-trivial
+Step 6: Live evidence, kept honest
+
+Five or more sample questions (docs/sample_questions.md), covering both APIs. Suggested coverage:
+
+Weather in a city you know
+A currency conversion with an amount, such as USD to NGN
+An ambiguous place ("weather in Springfield"). Does the geocoder pick the one you meant?
+A question that needs both tools
+An off-topic question. Does the assistant decline?
+
+For each, record the tool(s) used, the answer, and your own judgment after reading the real answer. Include at least one answer you consider weak. Last time the script pre-wrote the judgments, so this time have run_test_questions.py record only the answers and tools to a raw file. Write your judgments by hand in a separate document, so re-running the script never overwrites them.
+
+Error-handling evidence (docs/error_handling_evidence.md): a table with one row per failure case (invalid location, invalid currency, missing key, timeout, API unavailable, rate limit, bad language-model key). For each, give how you triggered it, what the user saw, and whether it was real or simulated. Invalid location and invalid currency can be triggered for real. Timeouts and outages are usually simulated by your tests, or by turning off your network once. Label each honestly.
+
+Step 7: The limitations and risks note
+
+docs/api_limitations_and_risks.md. Specific points to cover:
+
+Freshness: exchange rates update once a day, so "current" means the latest daily rate, not a live market quote. They can also differ from what a bank or street market actually gives you.
+Weather data: Open-Meteo's "current" values come from a weather service's data and may not match a local station.
+Quota: the free currency tier is capped at 1,500 requests a month.
+Ambiguity: the geocoder takes the first match, so common place names can resolve to the wrong city.
+Model risk: the model might answer from memory instead of calling a tool, which is why the system prompt forbids it.
+Third-party risk: both APIs can change or disappear. (Frankfurter's v1 is a real example of an API version being deprecated but kept available.) 
+frankfurter
+Privacy: city names and amounts go to third parties.
+Key risks: a key in a URL can leak through logs and error messages.
+Cost: every question costs a language-model call.
+Step 8: README
+
+Cover: what it does, which two APIs and why, how to get both keys, setup (copy .env.example .env, then fill it in), how to run, how to test (pytest), a file table, your Python version, and that no real key is committed.
+
+Step 9: Secret check, stronger this time
+powershell
+git status
+git check-ignore -v .env
+git grep -n "sk-"
+git log --all -S"sk-" --oneline
+
+You now have a key that doesn't start with sk-. So also run git grep and git log --all -S with the first six characters of your real ExchangeRate-API key (don't paste the key to me). Both should return nothing. If a real key was ever committed, revoke it in the provider's dashboard right away.
