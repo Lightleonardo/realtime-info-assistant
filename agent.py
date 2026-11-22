@@ -29,6 +29,12 @@ def _build_llm():
     kwargs = {"model": model, "api_key": api_key}
     if base_url:
         kwargs["base_url"] = base_url
+        # OpenRouter (and other OpenAI-compatible gateways) benefit from
+        # identifying headers; harmless when talking to OpenAI directly.
+        kwargs["default_headers"] = {
+            "HTTP-Referer": "https://github.com/realtime-info-assistant",
+            "X-Title": "realtime-info-assistant",
+        }
     return ChatOpenAI(**kwargs)
 
 

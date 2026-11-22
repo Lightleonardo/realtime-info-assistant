@@ -44,10 +44,13 @@ def get_current_weather(city: str) -> str:
     city = city.strip()
 
     # Step 1: geocode the city name to coordinates.
-    status, data = _get(
-        "https://geocoding-api.open-meteo.com/v1/search",
-        params={"name": city, "count": 1, "language": "en", "format": "json"},
-    )
+    try:
+        status, data = _get(
+            "https://geocoding-api.open-meteo.com/v1/search",
+            params={"name": city, "count": 1, "language": "en", "format": "json"},
+        )
+    except ApiProblem as exc:
+        return str(exc)
 
     results = data.get("results")
     if not results:
@@ -60,15 +63,18 @@ def get_current_weather(city: str) -> str:
     country = place.get("country", "")
 
     # Step 2: fetch the current forecast for the coordinates.
-    status, data = _get(
-        "https://api.open-meteo.com/v1/forecast",
-        params={
-            "latitude": latitude,
-            "longitude": longitude,
-            "current": "temperature_2m,wind_speed_10m",
-            "timezone": "auto",
-        },
-    )
+    try:
+        status, data = _get(
+            "https://api.open-meteo.com/v1/forecast",
+            params={
+                "latitude": latitude,
+                "longitude": longitude,
+                "current": "temperature_2m,wind_speed_10m",
+                "timezone": "auto",
+            },
+        )
+    except ApiProblem as exc:
+        return str(exc)
 
     if status >= 500 or "current" not in data:
         return "The weather service is unavailable right now. Please try again later."
@@ -123,10 +129,13 @@ def convert_currency(amount: float, from_currency: str, to_currency: str) -> str
         )
 
     # Call the ExchangeRate API.
-    status, data = _get(
-        f"https://v6.exchangerate-api.com/v6/{api_key}/pair/"
-        f"{from_currency}/{to_currency}/{amount}"
-    )
+    try:
+        status, data = _get(
+            f"https://v6.exchangerate-api.com/v6/{api_key}/pair/"
+            f"{from_currency}/{to_currency}/{amount}"
+        )
+    except ApiProblem as exc:
+        return str(exc)
 
     # Check the JSON body for an error, not just the HTTP status.
     if data.get("result") == "error":
