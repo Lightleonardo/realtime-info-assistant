@@ -1,7 +1,7 @@
-"""Tests for tools.py — no real network, ever.
+"""Tests for tools.py.
 
-``tools._transport`` is replaced with ``httpx.MockTransport`` for every HTTP
-call, so all responses are deterministic and offline.
+None of these tests touch the real network. Every HTTP call goes through a fake
+transport, so the tests are fast and work offline.
 """
 
 import os
@@ -9,15 +9,11 @@ import httpx
 
 import tools
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
 API_KEY = "test-key-123"
 
 
 def _install(handler):
-    """Install a MockTransport handler; return a restore callable."""
+    """Swap in a fake transport and return a function to put the real one back."""
     original = tools._transport
     tools._transport = httpx.MockTransport(handler)
 
@@ -29,11 +25,6 @@ def _install(handler):
 
 def _uninstall(restore):
     restore()
-
-
-# ---------------------------------------------------------------------------
-# Weather: success
-# ---------------------------------------------------------------------------
 
 def test_weather_success():
     calls = []

@@ -1,20 +1,15 @@
-"""Pytest configuration and shared fixtures for the realtime-info-assistant tests.
+"""Pytest configuration shared by all the tests.
 
-Tests never hit the real APIs.  The ``mock_transport`` fixture replaces
-``tools._transport`` with an ``httpx.MockTransport`` so every HTTP call made by
-the tools is deterministic and offline.
+The tests never call the real APIs. Instead, we swap in a fake transport so
+every HTTP call is predictable and works without a network connection.
 """
 
 import httpx
 import tools
 
 
-def _response(status=200, json=None, content=None, text=None):
-    return httpx.Response(status, json=json, content=content, text=text)
-
-
 class MockTransport:
-    """Context-managed replacement for ``tools._transport``."""
+    """Puts a fake transport in place of tools._transport, then puts it back."""
 
     def __init__(self, handler):
         self.handler = handler
@@ -29,27 +24,15 @@ class MockTransport:
         tools._transport = self.original
 
 
-# ---------------------------------------------------------------------------
-# Pytest fixtures
-# ---------------------------------------------------------------------------
-
 try:
-    import pytest  # noqa: F401  (only needed when running under pytest)
+    import pytest
 
     @pytest.fixture
     def mock_transport():
-        """Yield a context manager that installs a MockTransport for the test.
+        """Give each test a fake transport it can use and throw away."""
 
-        Usage::
-
-            def test_something(mock_transport):
-                with mock_transport(lambda request: httpx.Response(200, json={...})):
-                    ...
-
-        The transport is restored to its previous value afterwards.
-        """
         return MockTransport
 
 except ImportError:
-    # pytest not installed; the module still imports cleanly.
+    # If pytest isn't installed, this file still imports fine.
     pass

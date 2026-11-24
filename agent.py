@@ -29,8 +29,9 @@ def _build_llm():
     kwargs = {"model": model, "api_key": api_key}
     if base_url:
         kwargs["base_url"] = base_url
-        # OpenRouter (and other OpenAI-compatible gateways) benefit from
-        # identifying headers; harmless when talking to OpenAI directly.
+        # Some gateways (like OpenRouter) like to know who is calling them,
+        # so we send along a referer and title. It's harmless when talking
+        # to OpenAI directly.
         kwargs["default_headers"] = {
             "HTTP-Referer": "https://github.com/realtime-info-assistant",
             "X-Title": "realtime-info-assistant",
@@ -68,7 +69,8 @@ def run_agent(question: str) -> str:
 
     answer = result["messages"][-1].content
 
-    # Show which tool was used (evidence the assistant identified the right API).
+    # Include the name of the tool that was called, so it's clear the
+    # assistant picked the right API for the question.
     tools_used = [
         c["name"]
         for m in result["messages"]

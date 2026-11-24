@@ -1,24 +1,17 @@
-"""Run the sample questions and record answers + tools used to a raw file.
+"""Run the sample questions and save answers + tools used to a file.
 
-This script intentionally records ONLY the answers and the tools used — never
-the hand-written judgments.  Judgments live in docs/sample_questions.md and are
-written by hand so that re-running this script never overwrites them.
+This script only writes down the answers and which tools were used. It never
+touches the hand-written judgments in docs/sample_questions.md, so running it
+again won't erase your notes.
 
-Usage (no network to real LLM needed if you set USE_AGENT=0):
-
-    powershell
-    $env:EXCHANGERATE_API_KEY="your-real-key"
-    python run_test_questions.py
-
-Set USE_AGENT=1 to route through agent.run_agent (requires OPENAI_API_KEY).
-Set USE_AGENT=0 to call the tools directly (works for weather without any key;
-currency needs EXCHANGERATE_API_KEY).
+You can run it without an OpenAI key (USE_AGENT=0). It calls the tools
+directly. Currency conversion needs an EXCHANGERATE_API_KEY.
 """
 
 import os
 import sys
 
-# Allow running both from the repo root and from inside tests/.
+# Make sure we can import tools no matter where we run this from.
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import tools
@@ -27,26 +20,18 @@ USE_AGENT = os.environ.get("USE_AGENT", "0") == "1"
 
 RAW_FILE = os.path.join("docs", "test_answers_raw.txt")
 
-# ---------------------------------------------------------------------------
-# Sample questions covering both APIs
-# ---------------------------------------------------------------------------
-
+# A few questions that try both the weather and currency tools.
 QUESTIONS = [
-    # 1. Weather in a city you know
     "What is the current weather in Lagos?",
-    # 2. A currency conversion with an amount
     "Convert 100 USD to NGN.",
-    # 3. An ambiguous place ("weather in Springfield")
     "What is the weather in Springfield?",
-    # 4. A question that needs both tools
     "What is the weather in Tokyo, and how much is 50 USD in JPY?",
-    # 5. An off-topic question (should be declined)
     "Who won the 1998 World Cup?",
 ]
 
 
 def _record(question, tools_used, answer):
-    """Append one result to the raw file."""
+    """Write one question and its answer to the file."""
     line = (
         f"Q: {question}\n"
         f"TOOLS_USED: {','.join(tools_used) if tools_used else '(none)'}\n"
@@ -57,27 +42,18 @@ def _record(question, tools_used, answer):
         f.write(line)
 
 
-def _extract_tools_used_from_messages(result):
-    """Pull tool names out of an agent result dict."""
-    return [
-        c["name"]
-        for m in result["messages"]
-        if m.type == "ai"
-        for c in m.tool_calls
-    ]
-
-
 def run_via_tools(question):
-    """Run a question by calling the tools directly (no LLM needed).
+    """Call the tools directly instead of using the LLM agent.
 
-    Returns (tools_used, answer).  This is a best-effort keyword router so the
-    script is useful even without an OpenAI key.
+    This is a simple keyword-based router so the script works even without
+    an OpenAI API key. It returns the list of tools used and the answer text.
     """
     q = question.lower()
     tools_used = []
     answers = []
 
     if "weather" in q:
+        # Try to pull out the city name after words like "in", "for", or "at".
         city = None
         for word in ("in ", "for ", "at "):
             if word in q:
@@ -114,12 +90,13 @@ def run_via_tools(question):
 
 
 def run_via_agent(question):
-    """Run a question through the agent (requires OPENAI_API_KEY)."""
+    """Run a question through the real agent (needs OPENAI_API_KEY)."""
     import agent
 
     result = agent.run_agent(question)
     tools_used = []
-    # agent.run_agent already appends [Tool(s) used: ...] to the answer; parse it.
+    # The agent already tacks "[Tool(s) used: ...]" onto the answer, so we
+    # pull that part back out.
     if "[Tool(s) used:" in result:
         answer, _, tools_part = result.rpartition("[Tool(s) used: ")
         tools_used = [t.strip(" ]") for t in tools_part.split(",")]
@@ -130,7 +107,7 @@ def run_via_agent(question):
 
 def main():
     os.makedirs("docs", exist_ok=True)
-    # Start a fresh raw file each run.
+    # Overwrite the file each time we run.
     with open(RAW_FILE, "w", encoding="utf-8") as f:
         f.write("Sample question answers and tools used (raw, no judgments)\n")
         f.write(f"Mode: {'agent' if USE_AGENT else 'direct-tools'}\n")
@@ -142,7 +119,9 @@ def main():
                 tools_used, answer = run_via_agent(question)
             else:
                 tools_used, answer = run_via_tools(question)
-        except Exception as exc:  # noqa: BLE001 — record failures honestly
+        except Exception as exc:
+            # If something blows up, write down what happened instead of
+            # crashing the whole script.
             tools_used = []
             answer = f"ERROR: {exc}"
 
