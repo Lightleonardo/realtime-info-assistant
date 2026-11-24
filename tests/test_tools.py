@@ -72,9 +72,7 @@ def test_weather_success():
     assert "/forecast" in calls[1]
 
 
-# ---------------------------------------------------------------------------
 # Weather: unknown city
-# ---------------------------------------------------------------------------
 
 def test_weather_unknown_city():
     restore = _install(lambda request: httpx.Response(200, json={"generationtime_ms": 0.1}))
@@ -85,9 +83,7 @@ def test_weather_unknown_city():
     assert "couldn't find a place called Nowhereville" in result
 
 
-# ---------------------------------------------------------------------------
-# Weather: empty city (no HTTP request made)
-# ---------------------------------------------------------------------------
+# Weather: empty city
 
 def test_weather_empty_city_makes_no_request():
     called = []
@@ -103,6 +99,9 @@ def test_weather_empty_city_makes_no_request():
         _uninstall(restore)
     assert called == []
     assert "Please provide a city name" in result
+
+
+# Weather: whitespace city
 
 
 def test_weather_whitespace_city_makes_no_request():
@@ -124,7 +123,7 @@ def test_weather_whitespace_city_makes_no_request():
 
 # ---------------------------------------------------------------------------
 # Weather: timeout
-# ---------------------------------------------------------------------------
+
 
 def test_weather_timeout():
     restore = _install(
@@ -137,9 +136,8 @@ def test_weather_timeout():
     assert "took too long" in result
 
 
-# ---------------------------------------------------------------------------
 # Weather: unreachable network
-# ---------------------------------------------------------------------------
+
 
 def test_weather_unreachable_network():
     restore = _install(
@@ -152,9 +150,8 @@ def test_weather_unreachable_network():
     assert "Could not reach the service" in result
 
 
-# ---------------------------------------------------------------------------
 # Weather: 5xx response
-# ---------------------------------------------------------------------------
+
 
 def test_weather_5xx():
     def handler(request):
@@ -173,9 +170,8 @@ def test_weather_5xx():
     assert "service is unavailable" in result.lower()
 
 
-# ---------------------------------------------------------------------------
 # Weather: body that isn't JSON
-# ---------------------------------------------------------------------------
+
 
 def test_weather_non_json_body():
     restore = _install(lambda request: httpx.Response(200, content="not json"))
@@ -188,9 +184,8 @@ def test_weather_non_json_body():
 
 
 
-# ---------------------------------------------------------------------------
 # Currency: success
-# ---------------------------------------------------------------------------
+
 
 def test_currency_success():
     os.environ["EXCHANGERATE_API_KEY"] = API_KEY
@@ -217,9 +212,8 @@ def test_currency_success():
         os.environ.pop("EXCHANGERATE_API_KEY", None)
 
 
-# ---------------------------------------------------------------------------
-# Currency: bad code validation (no request)
-# ---------------------------------------------------------------------------
+# Currency: bad code validation
+
 
 def test_currency_bad_from_code():
     called = []
@@ -253,9 +247,8 @@ def test_currency_bad_to_code():
     assert "not a valid currency code" in result.lower()
 
 
-# ---------------------------------------------------------------------------
-# Currency: invalid amount (no request)
-# ---------------------------------------------------------------------------
+# Currency: invalid amount
+
 
 def test_currency_negative_amount():
     called = []
@@ -289,9 +282,8 @@ def test_currency_zero_amount():
     assert "positive" in result.lower()
 
 
-# ---------------------------------------------------------------------------
 # Currency: missing key
-# ---------------------------------------------------------------------------
+
 
 def test_currency_missing_key():
     os.environ.pop("EXCHANGERATE_API_KEY", None)
@@ -302,9 +294,8 @@ def test_currency_missing_key():
     assert "missing" in result.lower()
 
 
-# ---------------------------------------------------------------------------
 # Currency: documented error types
-# ---------------------------------------------------------------------------
+
 
 def test_currency_error_types():
     error_cases = [
@@ -332,9 +323,8 @@ def test_currency_error_types():
             os.environ.pop("EXCHANGERATE_API_KEY", None)
 
 
-# ---------------------------------------------------------------------------
-# Currency: unknown error type (catch-all)
-# ---------------------------------------------------------------------------
+# Currency: unknown error type
+
 
 def test_currency_unknown_error_type():
     os.environ["EXCHANGERATE_API_KEY"] = API_KEY
@@ -353,9 +343,8 @@ def test_currency_unknown_error_type():
         os.environ.pop("EXCHANGERATE_API_KEY", None)
 
 
-# ---------------------------------------------------------------------------
 # Currency: 429 rate limit
-# ---------------------------------------------------------------------------
+
 
 def test_currency_429():
     os.environ["EXCHANGERATE_API_KEY"] = API_KEY
@@ -370,9 +359,8 @@ def test_currency_429():
         os.environ.pop("EXCHANGERATE_API_KEY", None)
 
 
-# ---------------------------------------------------------------------------
-# Key never appears in returned messages
-# ---------------------------------------------------------------------------
+# Key never appears in messages
+
 
 def test_key_never_leaks_into_messages():
     """Even when a mocked failure would include the full URL, the key must not
@@ -391,9 +379,8 @@ def test_key_never_leaks_into_messages():
         os.environ.pop("EXCHANGERATE_API_KEY", None)
 
 
-# ---------------------------------------------------------------------------
-# Tool descriptions are non-trivial
-# ---------------------------------------------------------------------------
+# Tool descriptions
+
 
 def test_tool_descriptions_non_trivial():
     for tool in tools.TOOLS:
