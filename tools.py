@@ -2,7 +2,10 @@ import math
 import os
 
 import httpx
+from dotenv import load_dotenv
 from langchain_core.tools import tool
+
+load_dotenv()
 
 # How long we wait for an API to answer before giving up.
 TIMEOUT_SECONDS = 10.0
@@ -68,6 +71,10 @@ def get_current_weather(city: str) -> str:
     except ApiProblem as exc:
         return str(exc)
 
+    # A 5xx from the geocoder means the service is down, not that the city is bad.
+    if status >= 500:
+        return "The weather service is unavailable right now. Please try again later."
+
     results = data.get("results")
     if not results:
         return f"couldn't find a place called {city}."
@@ -97,10 +104,16 @@ def get_current_weather(city: str) -> str:
         return "The weather service is unavailable right now. Please try again later."
 
     current = data["current"]
-    temperature = current["temperature_2m"]
-    wind_speed = current["wind_speed_10m"]
-    temp_unit = data["current_units"]["temperature_2m"]
-    wind_unit = data["current_units"]["wind_speed_10m"]
+    temperature = current.get("temperature_2m")
+    wind_speed = current.get("wind_speed_10m")
+    current_units = data.get("current_units")
+    if current_units is None:
+        return "The weather service returned an unexpected response."
+    temp_unit = current_units.get("temperature_2m", "")
+    wind_unit = current_units.get("wind_speed_10m", "")
+
+    if temperature is None or wind_speed is None:
+        return "The weather service returned an unexpected response."
 
     return (
         f"It is {temperature}{temp_unit} with winds of {wind_speed}{wind_unit} "
@@ -119,6 +132,8 @@ def convert_currency(amount: float, from_currency: str, to_currency: str) -> str
     give you an error message instead.
     """
     # Make sure the currency codes look right before we ever call the API.
+    from_currency = from_currency.strip().upper()
+    to_currency = to_currency.strip().upper()
     if not (isinstance(from_currency, str) and len(from_currency) == 3 and from_currency.isalpha()):
         return (
             f"'{from_currency}' is not a valid currency code. "
@@ -165,17 +180,25 @@ def convert_currency(amount: float, from_currency: str, to_currency: str) -> str
             "inactive-key": "The ExchangeRate API key is inactive.",
             "quota-reached": "The ExchangeRate API quota has been reached.",
             "rate-limit-reached": "The ExchangeRate API is rate-limiting requests.",
+            "unsupported-code": "One of those currency codes isn't supported.",
         }
         return friendly.get(
             error_type, f"Currency conversion failed ({error_type})."
         )
 
-    rate = data["conversion_rate"]
-    result = data["conversion_result"]
+    # A 5xx or a non-success result means the currency service is down.
+    if status >= 500 or data.get("result") != "success":
+        return "The currency service is unavailable right now. Please try again later."
+
+    rate = data.get("conversion_rate")
+    converted = data.get("conversion_result")
+    if rate is None or converted is None:
+        return "The currency service returned an unexpected response."
+
     updated = data.get("time_last_update_utc", "recently")
 
     return (
-        f"{amount} {from_currency} = {result} {to_currency} "
+        f"{amount} {from_currency} = {converted} {to_currency} "
         f"at a rate of {rate} (last updated {updated})."
     )
 

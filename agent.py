@@ -1,5 +1,8 @@
 import os
 
+from dotenv import load_dotenv
+load_dotenv()
+
 from langchain.agents import create_agent
 from langchain_openai import ChatOpenAI
 from langgraph.errors import GraphRecursionError
@@ -24,6 +27,8 @@ SYSTEM_PROMPT = (
 
 def _build_llm():
     api_key = os.environ.get("OPENAI_API_KEY")
+    if not api_key:
+        raise ValueError("OPENAI_API_KEY is not set")
     model = os.environ.get("OPENAI_MODEL", "gpt-5-mini")
     base_url = os.environ.get("OPENAI_BASE_URL") or None
     kwargs = {"model": model, "api_key": api_key}
@@ -84,6 +89,9 @@ def run_agent(question: str) -> str:
 
 
 def main() -> None:
+    if not os.environ.get("OPENAI_API_KEY"):
+        print("Error: OPENAI_API_KEY is not set. Copy .env.example to .env and fill it in.")
+        return
     print("Realtime Info Assistant")
     print("Ask about weather or currency. Press Ctrl+C or Ctrl+D to exit.")
     while True:

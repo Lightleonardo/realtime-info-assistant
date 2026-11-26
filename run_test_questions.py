@@ -11,6 +11,9 @@ directly. Currency conversion needs an EXCHANGERATE_API_KEY.
 import os
 import sys
 
+from dotenv import load_dotenv
+load_dotenv()
+
 # Make sure we can import tools no matter where we run this from.
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 

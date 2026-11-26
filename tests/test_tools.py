@@ -379,6 +379,150 @@ def test_key_never_leaks_into_messages():
         os.environ.pop("EXCHANGERATE_API_KEY", None)
 
 
+# Weather: 5xx from geocoder (service down, not bad city)
+
+
+def test_weather_geocoder_5xx():
+    restore = _install(lambda request: httpx.Response(503, json={"error": "down"}))
+    try:
+        result = tools.get_current_weather.func("Lagos")
+    finally:
+        _uninstall(restore)
+    assert "service is unavailable" in result.lower()
+
+
+# Weather: missing current_units
+
+
+def test_weather_missing_current_units():
+    def handler(request):
+        if "search" in str(request.url):
+            return httpx.Response(
+                200,
+                json={"results": [{"name": "Lagos", "latitude": 6.45, "longitude": 3.4, "country": "Nigeria"}]},
+            )
+        return httpx.Response(
+            200,
+            json={
+                "current": {"temperature_2m": 30.5, "wind_speed_10m": 12.6},
+                # current_units deliberately missing
+            },
+        )
+
+    restore = _install(handler)
+    try:
+        result = tools.get_current_weather.func("Lagos")
+    finally:
+        _uninstall(restore)
+    assert "unexpected response" in result.lower()
+
+
+# Weather: missing temperature field
+
+
+def test_weather_missing_temperature():
+    def handler(request):
+        if "search" in str(request.url):
+            return httpx.Response(
+                200,
+                json={"results": [{"name": "Lagos", "latitude": 6.45, "longitude": 3.4, "country": "Nigeria"}]},
+            )
+        return httpx.Response(
+            200,
+            json={
+                "current": {"wind_speed_10m": 12.6},
+                "current_units": {"temperature_2m": "°C", "wind_speed_10m": "km/h"},
+            },
+        )
+
+    restore = _install(handler)
+    try:
+        result = tools.get_current_weather.func("Lagos")
+    finally:
+        _uninstall(restore)
+    assert "unexpected response" in result.lower()
+
+
+# Currency: 5xx from API
+
+
+def test_currency_5xx():
+    os.environ["EXCHANGERATE_API_KEY"] = API_KEY
+    try:
+        restore = _install(lambda request: httpx.Response(503, json={"error": "down"}))
+        try:
+            result = tools.convert_currency.func(100, "USD", "NGN")
+        finally:
+            _uninstall(restore)
+        assert "service is unavailable" in result.lower()
+    finally:
+        os.environ.pop("EXCHANGERATE_API_KEY", None)
+
+
+# Currency: 200 with missing fields
+
+
+def test_currency_missing_fields():
+    os.environ["EXCHANGERATE_API_KEY"] = API_KEY
+    try:
+        restore = _install(
+            lambda request: httpx.Response(200, json={"result": "success"})
+        )
+        try:
+            result = tools.convert_currency.func(100, "USD", "NGN")
+        finally:
+            _uninstall(restore)
+        assert "unexpected response" in result.lower()
+    finally:
+        os.environ.pop("EXCHANGERATE_API_KEY", None)
+
+
+# Currency: unsupported code from API
+
+
+def test_currency_unsupported_code():
+    os.environ["EXCHANGERATE_API_KEY"] = API_KEY
+    try:
+        restore = _install(
+            lambda request: httpx.Response(
+                200, json={"result": "error", "error-type": "unsupported-code"}
+            )
+        )
+        try:
+            result = tools.convert_currency.func(100, "USD", "XYZ")
+        finally:
+            _uninstall(restore)
+        assert "isn't supported" in result.lower()
+    finally:
+        os.environ.pop("EXCHANGERATE_API_KEY", None)
+
+
+# Currency: lowercase codes are normalized
+
+
+def test_currency_lowercase_codes():
+    os.environ["EXCHANGERATE_API_KEY"] = API_KEY
+    try:
+        restore = _install(
+            lambda request: httpx.Response(
+                200,
+                json={
+                    "result": "success",
+                    "conversion_rate": 1500.0,
+                    "conversion_result": 150000.0,
+                    "time_last_update_utc": "2026-11-22",
+                },
+            )
+        )
+        try:
+            result = tools.convert_currency.func(100, "usd", "ngn")
+        finally:
+            _uninstall(restore)
+        assert "100 USD = 150000.0 NGN" in result
+    finally:
+        os.environ.pop("EXCHANGERATE_API_KEY", None)
+
+
 # Tool descriptions
 
 
