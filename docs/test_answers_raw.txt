@@ -3,22 +3,34 @@ Mode: agent
 ============================================================
 
 Q: What is the current weather in Lagos?
-TOOLS_USED: (none)
-ANSWER: Could not connect to the language model service. Check your connection.
+TOOLS_USED: get_current_weather
+ANSWER: The current weather in Lagos is 28.5 °C with winds of 6.0 km/h.
+
+
 ------------------------------------------------------------
 Q: Convert 100 USD to NGN.
-TOOLS_USED: (none)
-ANSWER: Could not connect to the language model service. Check your connection.
+TOOLS_USED: convert_currency
+ANSWER: 100 USD is equal to **136,778.18 NGN** at an exchange rate of 1 USD = 1,367.7818 NGN (rates last updated on Thu 26 Nov 2026).
+
+
 ------------------------------------------------------------
 Q: What is the weather in Springfield?
-TOOLS_USED: (none)
-ANSWER: Could not connect to the language model service. Check your connection.
+TOOLS_USED: get_current_weather
+ANSWER: The current weather in Springfield, United States is ‑2.0 °C with winds around 18.2 km/h.
+
+
 ------------------------------------------------------------
 Q: What is the weather in Tokyo, and how much is 50 USD in JPY?
-TOOLS_USED: (none)
-ANSWER: Could not connect to the language model service. Check your connection.
+TOOLS_USED: get_current_weather,convert_currency
+ANSWER: **Weather in Tokyo:**  
+It’s 12.1 °C with winds of 2.3 km/h in Tokyo, Japan.
+
+**Currency conversion:**  
+50 USD = 7,958.73 JPY (rate ≈ 159.17 JPY per USD, last updated Thu 26 Nov 2026).
+
+
 ------------------------------------------------------------
 Q: Who won the 1998 World Cup?
 TOOLS_USED: (none)
-ANSWER: Could not connect to the language model service. Check your connection.
+ANSWER: I'm sorry, but I can only help with live weather and currency questions. I don't have information about sports events like the 1998 World Cup. Let me know if you need weather or currency data!
 ------------------------------------------------------------

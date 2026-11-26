@@ -1,7 +1,7 @@
 import os
 
 from dotenv import load_dotenv
-load_dotenv()
+load_dotenv(override=True)
 
 from langchain.agents import create_agent
 from langchain_openai import ChatOpenAI

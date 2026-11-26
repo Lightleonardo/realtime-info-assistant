@@ -1,14 +1,14 @@
 # Sample Questions & Judgments
 
 Five sample questions covering both APIs. For each: the question, the tool(s)
-used, the answer (from a live run of `run_test_questions.py`), and my own
-hand-written judgment after reading the real answer.
+used, the answer (from a live run of `run_test_questions.py` in `agent` mode),
+and my own hand-written judgment after reading the real answer.
 
 **How the answers were generated:** `run_test_questions.py` was run in
-`direct-tools` mode (`USE_AGENT=0`) because no OpenAI API key is configured.
-Weather answers came from live calls to Open-Meteo (no key needed). Currency
-answers could not be fetched live because no `EXCHANGERATE_API_KEY` is
-configured — the tool correctly reports that instead of inventing a rate.
+`agent` mode (`USE_AGENT=1`) against a real language model via OpenRouter
+(model: `nvidia/nemotron-3.5-lightning:free`). Weather answers came from live
+calls to Open-Meteo (no key needed). Currency answers came from live calls to
+ExchangeRate-API using the configured `EXCHANGERATE_API_KEY`.
 
 Raw machine-recorded answers (no judgments) are in
 `docs/test_answers_raw.txt`. Re-running `run_test_questions.py` overwrites that
@@ -22,12 +22,11 @@ raw file only; it never touches the judgments below.
 
 **Tool(s) used:** `get_current_weather`
 
-**Answer:** It is 29.7°C with winds of 13.4 km/h in Lagos, Nigeria.
+**Answer:** The current weather in Lagos is 28.5°C with winds of 6.0 km/h.
 
-**Judgment:** Good. The geocoder resolved Lagos to the right city (Nigeria,
-not Lagos, Portugal), the temperature and wind are plausible for Lagos in
-November, and the units (°C, km/h) are shown. This is the strongest answer in
-the set.
+**Judgment:** Good. The geocoder resolved Lagos to the right city (Nigeria),
+the temperature and wind are plausible, and the units (°C, km/h) are shown.
+This is the strongest answer in the set.
 
 ---
 
@@ -37,14 +36,13 @@ the set.
 
 **Tool(s) used:** `convert_currency`
 
-**Answer:** Currency conversion is not configured: the ExchangeRate API key is
-missing.
+**Answer:** 100 USD is equal to **136,778.18 NGN** at an exchange rate of
+1 USD = 1,367.7818 NGN (rates last updated on Thu 26 Nov 2026).
 
-**Judgment:** Honest but unhelpful — the tool behaves correctly (it refuses to
-invent a rate without a key), but the user gets no conversion. This is expected
-until the user adds a real `EXCHANGERATE_API_KEY` to `.env`. Once configured,
-the answer should read like "100 USD = 150,000 NGN at a rate of 1500.0 (last
-updated …)".
+**Judgment:** Good. The assistant correctly identified that a currency tool
+was needed, called ExchangeRate-API, and returned the amount, both currency
+codes, the rate, and the last-updated timestamp. The rate (≈1,368 NGN per USD)
+is plausible for November 2026.
 
 ---
 
@@ -54,15 +52,14 @@ updated …)".
 
 **Tool(s) used:** `get_current_weather`
 
-**Answer:** It is 9.6°C with winds of 24.2 km/h in Springfield, United States.
+**Answer:** The current weather in Springfield, United States is -2.0°C with
+winds around 18.2 km/h.
 
-**Judgment:** Weak. The geocoder takes the first match, which happened to be
+**Judgment:** Weak. The geocoder takes the first match, which resolved to
 Springfield, United States — but the user might have meant Springfield,
 Illinois, or Springfield, Massachusetts, or any of the other Springfields.
 The answer gives no indication that an ambiguous name was resolved to just one
-option. This matches the documented ambiguity risk (the geocoder takes the first
-match). To improve, the assistant could ask "Which Springfield?" when multiple
-results exist, but the current geocoder only returns `count=1`.
+option. This matches the documented ambiguity risk.
 
 ---
 
@@ -72,13 +69,17 @@ results exist, but the current geocoder only returns `count=1`.
 
 **Tool(s) used:** `get_current_weather`, `convert_currency`
 
-**Answer:** (live weather) It is 6.9°C with winds of 2.4 km/h in Tokyo, Japan.
-(currency) not configured — ExchangeRate API key missing.
+**Answer:** Weather in Tokyo: It's 12.1°C with winds of 2.3 km/h in Tokyo,
+Japan.
 
-**Judgment:** Partially good. The weather part is correct and useful. The
-currency part fails only because no key is configured; structurally the tool
-was selected correctly, which shows the assistant can identify that two tools
-are needed. With a key, this would be a strong multi-tool answer.
+Currency conversion: 50 USD = 7,958.73 JPY (rate ≈ 159.17 JPY per USD,
+last updated on Thu 26 Nov 2026).
+
+**Judgment:** Good. The assistant correctly identified that two different
+tools were needed and called both. The weather answer is accurate for Tokyo,
+and the currency conversion shows both the result and the rate. This
+demonstrates the core requirement: the assistant identified the appropriate
+API tools for a multi-part question.
 
 ---
 
@@ -88,7 +89,9 @@ are needed. With a key, this would be a strong multi-tool answer.
 
 **Tool(s) used:** (none)
 
-**Answer:** I can only help with weather and currency questions.
+**Answer:** I'm sorry, but I can only help with live weather and currency
+questions. I don't have information about sports events like the 1998 World
+Cup. Let me know if you need weather or currency data!
 
 **Judgment:** Good. The assistant declined an off-topic question without
 calling any tool or guessing, exactly as the system prompt requires. No live
@@ -101,11 +104,7 @@ data was fetched, so no third-party data was exposed.
 | # | Question | Tools | Answer quality | Judgment |
 |---|----------|-------|----------------|----------|
 | 1 | Weather in Lagos | get_current_weather | Strong | Correct city, plausible values, units shown |
-| 2 | Convert 100 USD to NGN | convert_currency | Poor (config) | Correctly refuses without a key; needs live key |
+| 2 | Convert 100 USD to NGN | convert_currency | Good | Correct rate, result, and last-updated timestamp |
 | 3 | Weather in Springfield | get_current_weather | Weak | First-match geocoder may pick wrong Springfield |
-| 4 | Weather in Tokyo + USD→JPY | get_current_weather, convert_currency | Mixed | Weather good; currency blocked by missing key |
+| 4 | Weather in Tokyo + USD→JPY | get_current_weather, convert_currency | Good | Both tools selected correctly |
 | 5 | Who won the 1998 World Cup? | (none) | Good | Politely declined, no tool called |
-
-**Note:** To get live currency answers, add a real key from
-https://exchangerate-api.com to `.env` as `EXCHANGERATE_API_KEY` and re-run
-`run_test_questions.py`.
