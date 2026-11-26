@@ -116,5 +116,4 @@ Developed and tested on **Python 3.13.13**.
 ## Security
 
 No real API key is committed to this repository. `.env` is gitignored, and the
-HTTP helper deliberately strips URLs and keys from any error message before
-showing it to the user.
+HTTP helper deliberately strips URLs and keys from any error message \.
