@@ -102,7 +102,7 @@ overwrites your hand-written judgments in `docs/sample_questions.md`.
 | `run_test_questions.py` | Records sample-question answers + tools used to a raw file. |
 | `requirements.txt` | Pinned direct dependencies. |
 | `.env.example` | Placeholder environment variables (no real keys). |
-| `.gitignore` | Ignores `.env`, `.venv/`, caches, OS files, and `steps.docx`. |
+| `.gitignore` | Ignores `.env`, `.venv/`, `.vscode/`, caches, OS files, and `steps.docx`. |
 | `docs/api_exploration.md` | Live API shapes observed during Step 2 (success and failure JSON). |
 | `docs/sample_questions.md` | 5 sample questions with answers and hand-written judgments. |
 | `docs/error_handling_evidence.md` | One row per failure case: trigger, what the user saw, real vs simulated. |

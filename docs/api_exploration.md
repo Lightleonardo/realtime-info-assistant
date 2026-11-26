@@ -99,24 +99,69 @@ Not triggered against the live API (Open-Meteo returned 200). Per the steps, if 
 
 You must obtain a free key at https://exchangerate-api.com and put it in `.env` (never committed).
 
-### Live call with dummy key (auth failure)
+### Live success call (USD → NGN)
 ```
-GET https://v6.exchangerate-api.com/v6/dummy-key/pair/USD/NGN/100
+GET https://v6.exchangerate-api.com/v6/YOUR-KEY/pair/USD/NGN/100
 ```
 
-Result: **HTTP 403 Forbidden**. No JSON body was readable through the fetcher.
+Response (HTTP 200) — real key redacted:
+```json
+{
+  "result": "success",
+  "documentation": "https://www.exchangerate-api.com/docs",
+  "terms_of_use": "https://www.exchangerate-api.com/terms",
+  "time_last_update_unix": 1795651201,
+  "time_last_update_utc": "Thu, 26 Nov 2026 00:00:01 +0000",
+  "time_next_update_unix": 1795737601,
+  "time_next_update_utc": "Fri, 27 Nov 2026 00:00:01 +0000",
+  "base_code": "USD",
+  "target_code": "NGN",
+  "conversion_rate": 1367.7818,
+  "conversion_result": 136778.18
+}
+```
 
-**Error shape:** A bad/missing key is communicated **via HTTP status (403)**. Our tool reads `EXCHANGERATE_API_KEY` from the environment and returns a clear "missing key" message before making any request; a 403 from the live API should surface as an authentication problem.
+**Fields we need:** `conversion_rate`, `conversion_result`, `time_last_update_utc` (or `time_last_update_unix`), plus `base_code` and `target_code`.
 
-### Failure: nonsense currency code / bad amount
-Not triggered against the live API (auth blocks the request without a real key). Per the steps, we validate locally first:
-- Currency codes must be exactly three letters (e.g. "dollars" rejected with a helpful message).
-- Amount must be a positive, finite number.
+### Live failure: wrong key
+```
+GET https://v6.exchangerate-api.com/v6/wrong-key-123/pair/USD/NGN/100
+```
 
-Then we check the JSON body for `result == "error"` (not just HTTP status), map known `error-type` values to friendly messages, and use a catch-all for unknown ones. These paths are covered by unit tests with mocked responses (see Step 5).
+Response (HTTP 403):
+```json
+{
+  "result": "error",
+  "documentation": "https://www.exchangerate-api.com/docs",
+  "terms-of-use": "https://www.exchangerate-api.com/terms",
+  "error-type": "invalid-key"
+}
+```
+
+**Error shape:** HTTP 403 with `result == "error"` and `error-type == "invalid-key"` in the JSON body. Both the HTTP status and the body signal the problem.
+
+### Live failure: unsupported currency code (XYZ)
+```
+GET https://v6.exchangerate-api.com/v6/YOUR-KEY/pair/USD/XYZ/100
+```
+
+Response (HTTP 404):
+```json
+{
+  "result": "error",
+  "documentation": "https://www.exchangerate-api.com/docs",
+  "terms-of-use": "https://www.exchangerate-api.com/terms",
+  "error-type": "unsupported-code"
+}
+```
+
+**Error shape:** HTTP 404 with `result == "error"` and `error-type == "unsupported-code"` in the JSON body. Our tool maps `unsupported-code` to a friendly message.
+
+### Local validation (before any request)
+Currency codes must be exactly three letters (e.g. `"dollars"` rejected with a helpful message). Amount must be a positive, finite number. These checks run before any HTTP request, so no network call is made for obviously bad input.
 
 ### Fields we need (on success)
-Expected success shape (from provider docs): `conversion_rate` and `conversion_result`, plus the time the rate was last updated. Return a sentence with the amount, both codes, the rate, and when the rate was last updated.
+`conversion_rate`, `conversion_result`, `time_last_update_utc`. Return a sentence with the amount, both codes, the rate, and when the rate was last updated.
 
 ## 4. Summary of error shapes
 
@@ -124,10 +169,8 @@ Expected success shape (from provider docs): `conversion_rate` and `conversion_r
 |-----|---------|-------------|------------------|----------------------|
 | Geocoding | Unknown place | 200 | missing/empty `results` | JSON body only |
 | Forecast | 5xx / missing `current` | 5xx (expected) | `current` absent | HTTP status + body |
-| Currency | Bad/missing key | 403 (observed) | n/a | HTTP status |
-| Currency | Bad `error-type` | varies | `result == "error"` | JSON body |
+| Currency | Bad/missing key | 403 (observed) | `result == "error"`, `error-type` | HTTP status + JSON body |
+| Currency | Unsupported code | 404 (observed) | `result == "error"`, `error-type == "unsupported-code"` | HTTP status + JSON body |
+| Currency | Local validation failure | n/a (no request) | n/a | Local check, no HTTP |
 
-**Key takeaway:** Do not rely only on HTTP status. The geocoder reports "not found" with HTTP 200 plus an empty JSON body, so the tool must inspect the JSON. The currency API reports auth failure via HTTP 403, so the tool must handle non-200 statuses too.
-
-## Next step
-Get your own free key at https://exchangerate-api.com, add it to `.env` as `EXCHANGERATE_API_KEY`, then run a live currency call to confirm the success JSON shape before writing `tools.py` (Step 3).
+**Key takeaway:** Do not rely only on HTTP status. The geocoder reports "not found" with HTTP 200 plus an empty JSON body, so the tool must inspect the JSON. The currency API reports auth failure and unsupported codes via non-200 HTTP status **and** `result == "error"` in the JSON body, so the tool must handle both.

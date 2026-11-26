@@ -76,8 +76,9 @@ Currency conversion: 50 USD = 7,958.73 JPY (rate ≈ 159.17 JPY per USD,
 last updated on Thu 26 Nov 2026).
 
 **Judgment:** Good. The assistant correctly identified that two different
-tools were needed and called both. The weather answer is accurate for Tokyo,
-and the currency conversion shows both the result and the rate. This
+tools were needed and called both. The weather answer is plausible for Tokyo
+(it is a live value from Open-Meteo, not independently verified), and the
+currency conversion shows both the result and the rate. This
 demonstrates the core requirement: the assistant identified the appropriate
 API tools for a multi-part question.
 
