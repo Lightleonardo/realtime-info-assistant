@@ -1,24 +1,24 @@
 Sample question answers and tools used (raw, no judgments)
-Mode: direct-tools
+Mode: agent
 ============================================================
 
 Q: What is the current weather in Lagos?
-TOOLS_USED: get_current_weather
-ANSWER: It is 29.7°C with winds of 13.4km/h in Lagos, Nigeria.
+TOOLS_USED: (none)
+ANSWER: Could not connect to the language model service. Check your connection.
 ------------------------------------------------------------
 Q: Convert 100 USD to NGN.
-TOOLS_USED: convert_currency
-ANSWER: Currency conversion is not configured: the ExchangeRate API key is missing.
+TOOLS_USED: (none)
+ANSWER: Could not connect to the language model service. Check your connection.
 ------------------------------------------------------------
 Q: What is the weather in Springfield?
-TOOLS_USED: get_current_weather
-ANSWER: It is 9.6°C with winds of 24.2km/h in Springfield, United States.
+TOOLS_USED: (none)
+ANSWER: Could not connect to the language model service. Check your connection.
 ------------------------------------------------------------
 Q: What is the weather in Tokyo, and how much is 50 USD in JPY?
-TOOLS_USED: get_current_weather,convert_currency
-ANSWER: couldn't find a place called tokyo, and how much is 50 usd in jpy. Currency conversion is not configured: the ExchangeRate API key is missing.
+TOOLS_USED: (none)
+ANSWER: Could not connect to the language model service. Check your connection.
 ------------------------------------------------------------
 Q: Who won the 1998 World Cup?
 TOOLS_USED: (none)
-ANSWER: I can only help with weather and currency questions.
+ANSWER: Could not connect to the language model service. Check your connection.
 ------------------------------------------------------------
